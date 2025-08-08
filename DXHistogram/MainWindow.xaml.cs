@@ -1,17 +1,18 @@
-﻿using DevExpress.Charts.Designer;
-using DevExpress.Utils;
-using DevExpress.Xpf.Charts;
-using Microsoft.Win32;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Windows;
+using System.IO;
+using Microsoft.Win32;
+using System.Globalization;
+using DevExpress.Xpf.Charts;
+using DevExpress.Utils;
 using System.Xml.Linq;
 using MessageBox = System.Windows.MessageBox;
 using OpenFileDialog = System.Windows.Forms.OpenFileDialog;
+using DevExpress.Charts.Designer;
 using SaveFileDialog = System.Windows.Forms.SaveFileDialog;
+using DevExpress.Xpf.Dialogs;  // Add this using for DX dialogs
 
 namespace DXHistogram
 {
@@ -21,6 +22,10 @@ namespace DXHistogram
     public partial class MainWindow : Window
     {
         private List<double> currentData;
+
+        // Constants for status messages
+        const string LayoutSavedFormatString = "The Chart Layout saved to the '{0}' file";
+        const string LayoutLoadedFormatString = "The Chart Layout loaded from the '{0}' file";
 
         public MainWindow()
         {
@@ -89,43 +94,6 @@ namespace DXHistogram
             UpdateStatistics();
         }
 
-        private void GenerateSampleData_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                if (!int.TryParse(txtSampleCount.Text, out int count) || count <= 0)
-                {
-                    MessageBox.Show("Please enter a valid positive number for count.", "Invalid Count", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                if (!double.TryParse(txtSampleMean.Text, out double mean))
-                {
-                    MessageBox.Show("Please enter a valid number for mean.", "Invalid Mean", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                if (!double.TryParse(txtSampleStdDev.Text, out double stdDev) || stdDev <= 0)
-                {
-                    MessageBox.Show("Please enter a valid positive number for standard deviation.", "Invalid Std Dev", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                currentData = GenerateSampleData(count, mean, stdDev);
-                UpdateHistogram();
-                MessageBox.Show($"Generated {count} sample data points.", "Sample Data Generated", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error generating sample data: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void UpdateHistogram_Click(object sender, RoutedEventArgs e)
-        {
-            UpdateHistogram();
-        }
-
         private void UpdateHistogram()
         {
             try
@@ -137,13 +105,8 @@ namespace DXHistogram
                     return;
                 }
 
-                if (!int.TryParse(txtBinCount.Text, out int binCount) || binCount <= 0)
-                {
-                    MessageBox.Show("Please enter a valid positive number for bin count.", "Invalid Bin Count", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                var histogramData = CreateHistogramBins(currentData, binCount);
+                // Use default bin count of 10, or let Chart Designer handle bin configuration
+                var histogramData = CreateHistogramBins(currentData, 10);
                 this.DataContext = histogramData;
                 UpdateStatistics();
             }
@@ -163,7 +126,7 @@ namespace DXHistogram
                     Title = "Select Data File"
                 };
 
-                if (openFileDialog.ShowDialog().Equals("OK"))
+                if (openFileDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
                     string content = File.ReadAllText(openFileDialog.FileName);
 
@@ -219,19 +182,21 @@ namespace DXHistogram
         {
             try
             {
-                SaveFileDialog saveFileDialog = new SaveFileDialog
+                // Use DevExpress Save File Dialog as per official documentation
+                DXSaveFileDialog dialog = new DXSaveFileDialog
                 {
+                    DefaultExt = "xml",
                     Filter = "XML files (*.xml)|*.xml",
                     Title = "Save Chart Layout",
-                    DefaultExt = "xml",
                     FileName = "ChartLayout.xml"
                 };
 
-                if (saveFileDialog.ShowDialog().Equals("OK"))
+                bool? result = dialog.ShowDialog();
+                if (result.HasValue && result.Value)
                 {
                     // Save the chart layout to XML
-                    chartControl.ExportToXlsx(saveFileDialog.FileName);
-                    MessageBox.Show($"Chart layout saved successfully to {saveFileDialog.FileName}",
+                    chartControl.SaveToFile(dialog.FileName);
+                    MessageBox.Show(String.Format(LayoutSavedFormatString, dialog.FileName),
                         "Layout Saved", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
@@ -246,18 +211,25 @@ namespace DXHistogram
         {
             try
             {
-                OpenFileDialog openFileDialog = new OpenFileDialog
+                // Use DevExpress Open File Dialog as per official documentation
+                DXOpenFileDialog dialog = new DXOpenFileDialog
                 {
+                    DefaultExt = "xml",
                     Filter = "XML files (*.xml)|*.xml",
                     Title = "Load Chart Layout"
                 };
 
-                if (openFileDialog.ShowDialog().Equals("OK"))
+                bool? result = dialog.ShowDialog();
+                if (result.HasValue && result.Value)
                 {
                     // Load the chart layout from XML
-                    //TODO:
-                    //chartControl.RestoreLayoutFromXml(openFileDialog.FileName);
-                    MessageBox.Show($"Chart layout loaded successfully from {openFileDialog.FileName}",
+                    chartControl.LoadFromFile(dialog.FileName);
+
+                    // IMPORTANT: LoadFrom... methods create new instances of chart elements to restore the Chart Control's layout.
+                    // You should recreate bindings if you bind UI controls to chart elements.
+                    CreateBindings();
+
+                    MessageBox.Show(String.Format(LayoutLoadedFormatString, dialog.FileName),
                         "Layout Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
@@ -265,6 +237,32 @@ namespace DXHistogram
             {
                 MessageBox.Show($"Error loading chart layout: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Recreates data bindings after loading chart layout
+        /// This is required because LoadFromFile creates new chart element instances
+        /// </summary>
+        private void CreateBindings()
+        {
+            try
+            {
+                // Find the bar series (there should be one based on your XAML)
+                var barSeries = chartControl.Diagram.Series.OfType<BarSideBySideSeries2D>().FirstOrDefault();
+
+                if (barSeries != null)
+                {
+                    // Rebind the data source to the current data context
+                    barSeries.DataSource = this.DataContext;
+                    barSeries.ArgumentDataMember = "Range";
+                    barSeries.ValueDataMember = "Frequency";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error recreating bindings: {ex.Message}", "Binding Error",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -285,7 +283,7 @@ namespace DXHistogram
                     DefaultExt = "txt"
                 };
 
-                if (saveFileDialog.ShowDialog().Equals("OK"))
+                if (saveFileDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
                     string content = string.Join(Environment.NewLine, currentData.Select(x => x.ToString(CultureInfo.InvariantCulture)));
                     File.WriteAllText(saveFileDialog.FileName, content);
