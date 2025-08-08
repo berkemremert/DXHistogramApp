@@ -42,12 +42,17 @@
                                     Margin="0,0,0,5"/>
                             <Button x:Name="btnLoadFromFile" 
                                     Content="Load from File" 
-                                    Click="LoadFromFile_Click"/>
+                                    Click="LoadFromFile_Click"
+                                    Margin="0,0,0,5"/>
+                            <Button x:Name="btnSaveData" 
+                                    Content="Save Data to File" 
+                                    Click="SaveData_Click"
+                                    Background="LightBlue"/>
                         </StackPanel>
                     </GroupBox>
 
                     <!-- Chart Design & Layout -->
-                    <GroupBox Header="Chart Design Layout" Margin="0,0,0,15">
+                    <GroupBox Header="Chart Design  Layout" Margin="0,0,0,15">
                         <StackPanel>
                             <Button x:Name="btnOpenDesigner" 
                                     Content="Open Chart Designer" 

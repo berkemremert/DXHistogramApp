@@ -9,9 +9,7 @@ using DevExpress.Xpf.Charts;
 using DevExpress.Utils;
 using System.Xml.Linq;
 using MessageBox = System.Windows.MessageBox;
-using OpenFileDialog = System.Windows.Forms.OpenFileDialog;
 using DevExpress.Charts.Designer;
-using SaveFileDialog = System.Windows.Forms.SaveFileDialog;
 using DevExpress.Xpf.Dialogs;  // Add this using for DX dialogs
 
 namespace DXHistogram
@@ -120,13 +118,16 @@ namespace DXHistogram
         {
             try
             {
-                OpenFileDialog openFileDialog = new OpenFileDialog
+                // Use DevExpress Open File Dialog
+                DXOpenFileDialog openFileDialog = new DXOpenFileDialog
                 {
                     Filter = "Text files (*.txt)|*.txt|CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-                    Title = "Select Data File"
+                    Title = "Select Data File",
+                    DefaultExt = "txt"
                 };
 
-                if (openFileDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                bool? result = openFileDialog.ShowDialog();
+                if (result.HasValue && result.Value)
                 {
                     string content = File.ReadAllText(openFileDialog.FileName);
 
@@ -276,16 +277,33 @@ namespace DXHistogram
                     return;
                 }
 
-                SaveFileDialog saveFileDialog = new SaveFileDialog
+                // Use DevExpress Save File Dialog
+                DXSaveFileDialog saveFileDialog = new DXSaveFileDialog
                 {
                     Filter = "Text files (*.txt)|*.txt|CSV files (*.csv)|*.csv",
                     Title = "Save Data File",
-                    DefaultExt = "txt"
+                    DefaultExt = "txt",
+                    FileName = "HistogramData"
                 };
 
-                if (saveFileDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                bool? result = saveFileDialog.ShowDialog();
+                if (result.HasValue && result.Value)
                 {
-                    string content = string.Join(Environment.NewLine, currentData.Select(x => x.ToString(CultureInfo.InvariantCulture)));
+                    string content;
+                    string extension = Path.GetExtension(saveFileDialog.FileName).ToLower();
+
+                    if (extension == ".csv")
+                    {
+                        // Save as CSV with header
+                        content = "Value" + Environment.NewLine +
+                                 string.Join(Environment.NewLine, currentData.Select(x => x.ToString(CultureInfo.InvariantCulture)));
+                    }
+                    else
+                    {
+                        // Save as plain text (one value per line)
+                        content = string.Join(Environment.NewLine, currentData.Select(x => x.ToString(CultureInfo.InvariantCulture)));
+                    }
+
                     File.WriteAllText(saveFileDialog.FileName, content);
                     MessageBox.Show($"Data saved successfully to {saveFileDialog.FileName}", "Data Saved", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
