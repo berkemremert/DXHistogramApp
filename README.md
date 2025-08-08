@@ -70,7 +70,7 @@
 - **ScrollViewer**: Scrollable content areas
 - **Separator**: Visual dividers between sections
 
-## 📋 System Requirements
+## System Requirements
 
 - Windows 10/11 or Windows Server 2016+
 - .NET Framework 4.7.2+ or .NET 5+
