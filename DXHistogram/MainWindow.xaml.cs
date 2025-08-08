@@ -103,8 +103,12 @@ namespace DXHistogram
                     return;
                 }
 
-                // Use default bin count of 10, or let Chart Designer handle bin configuration
-                var histogramData = CreateHistogramBins(currentData, 10);
+                // Get custom parameters or use defaults
+                int binCount = GetBinCount();
+                double? customMin = GetCustomMinValue();
+                double? customMax = GetCustomMaxValue();
+
+                var histogramData = CreateHistogramBins(currentData, binCount, customMin, customMax);
                 this.DataContext = histogramData;
                 UpdateStatistics();
             }
@@ -112,6 +116,52 @@ namespace DXHistogram
             {
                 MessageBox.Show($"Error updating histogram: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void ApplyCustomRange_Click(object sender, RoutedEventArgs e)
+        {
+            UpdateHistogram();
+        }
+
+        private void ResetToDataRange_Click(object sender, RoutedEventArgs e)
+        {
+            if (currentData == null || !currentData.Any())
+            {
+                MessageBox.Show("No data available to reset range.", "No Data", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Reset to actual data range
+            txtMinValue.Text = currentData.Min().ToString("F2");
+            txtMaxValue.Text = currentData.Max().ToString("F2");
+            UpdateHistogram();
+        }
+
+        private int GetBinCount()
+        {
+            if (int.TryParse(txtBinCount.Text, out int binCount) && binCount > 0)
+            {
+                return Math.Min(binCount, 100); // Limit to reasonable maximum
+            }
+            return 10; // Default
+        }
+
+        private double? GetCustomMinValue()
+        {
+            if (double.TryParse(txtMinValue.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double minValue))
+            {
+                return minValue;
+            }
+            return null; // Use data minimum
+        }
+
+        private double? GetCustomMaxValue()
+        {
+            if (double.TryParse(txtMaxValue.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double maxValue))
+            {
+                return maxValue;
+            }
+            return null; // Use data maximum
         }
 
         private void LoadFromFile_Click(object sender, RoutedEventArgs e)
@@ -147,6 +197,11 @@ namespace DXHistogram
                     if (dataValues.Count > 0)
                     {
                         currentData = dataValues;
+
+                        // Auto-populate range fields with data bounds
+                        txtMinValue.Text = currentData.Min().ToString("F2");
+                        txtMaxValue.Text = currentData.Max().ToString("F2");
+
                         UpdateHistogram();
                         MessageBox.Show($"Successfully loaded {dataValues.Count} data points from file.", "File Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
@@ -364,21 +419,30 @@ namespace DXHistogram
             return mean + stdDev * randStdNormal;
         }
 
-        private List<HistogramBin> CreateHistogramBins(List<double> values, int binCount = 10)
+        private List<HistogramBin> CreateHistogramBins(List<double> values, int binCount = 10, double? customMin = null, double? customMax = null)
         {
             if (!values.Any()) return new List<HistogramBin>();
 
-            var min = values.Min();
-            var max = values.Max();
+            // Use custom range if provided, otherwise use data range
+            var min = customMin ?? values.Min();
+            var max = customMax ?? values.Max();
 
-            // Handle case where all values are the same
-            if (Math.Abs(max - min) < double.Epsilon)
+            // Validate range
+            if (min >= max)
+            {
+                MessageBox.Show("Minimum value must be less than maximum value.", "Invalid Range",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return new List<HistogramBin>();
+            }
+
+            // Handle case where all values are the same and no custom range is provided
+            if (Math.Abs(max - min) < double.Epsilon && customMin == null && customMax == null)
             {
                 return new List<HistogramBin>
                 {
                     new HistogramBin
                     {
-                        Range = $"{min:F1}",
+                        Range = $"{min:F2}",
                         Frequency = values.Count,
                         LowerBound = min,
                         UpperBound = min
@@ -388,6 +452,10 @@ namespace DXHistogram
 
             var binWidth = (max - min) / binCount;
             var bins = new List<HistogramBin>();
+
+            // Track values outside the specified range
+            int valuesBeforeRange = 0;
+            int valuesAfterRange = 0;
 
             for (int i = 0; i < binCount; i++)
             {
@@ -401,11 +469,29 @@ namespace DXHistogram
 
                 bins.Add(new HistogramBin
                 {
-                    Range = $"{lowerBound:F1}-{upperBound:F1}",
+                    Range = $"{lowerBound:F2}-{upperBound:F2}",
                     Frequency = count,
                     LowerBound = lowerBound,
                     UpperBound = upperBound
                 });
+            }
+
+            // Count values outside the custom range if applicable
+            if (customMin.HasValue || customMax.HasValue)
+            {
+                valuesBeforeRange = values.Count(v => v < min);
+                valuesAfterRange = values.Count(v => v > max);
+
+                if (valuesBeforeRange > 0 || valuesAfterRange > 0)
+                {
+                    var message = $"Note: {valuesBeforeRange} values below range, {valuesAfterRange} values above range are excluded from histogram.";
+                    // You could display this in a status bar or label if you have one
+                    // For now, we'll show it as a message box only if significant data is excluded
+                    if (valuesBeforeRange + valuesAfterRange > values.Count * 0.1) // More than 10% excluded
+                    {
+                        MessageBox.Show(message, "Data Outside Range", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
             }
 
             return bins;

@@ -14,6 +14,51 @@
         <Border Grid.Column="0" Background="LightGray" Margin="5" CornerRadius="5">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="10">
+                    <!-- Add this GroupBox to your existing XAML layout -->
+                    <GroupBox Header="Histogram Configuration" Grid.Row="1" Grid.Column="0" Margin="5">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Bin Count -->
+                            <Label Content="Bins:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
+                            <TextBox x:Name="txtBinCount" Grid.Row="0" Grid.Column="1" Margin="5,2" 
+                 Text="10" VerticalAlignment="Center" Width="60" HorizontalAlignment="Left"
+                 ToolTip="Number of histogram bins (1-100)"/>
+
+                            <!-- Min Value -->
+                            <Label Content="Min:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center"/>
+                            <TextBox x:Name="txtMinValue" Grid.Row="1" Grid.Column="1" Margin="5,2" 
+                 VerticalAlignment="Center" Width="100" HorizontalAlignment="Left"
+                 ToolTip="Minimum value for histogram range (leave empty for data minimum)"/>
+
+                            <!-- Max Value -->
+                            <Label Content="Max:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center"/>
+                            <TextBox x:Name="txtMaxValue" Grid.Row="2" Grid.Column="1" Margin="5,2" 
+                 VerticalAlignment="Center" Width="100" HorizontalAlignment="Left"
+                 ToolTip="Maximum value for histogram range (leave empty for data maximum)"/>
+
+                            <!-- Buttons -->
+                            <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" 
+                    Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button x:Name="btnApplyRange" Content="Apply Range" 
+                    Click="ApplyCustomRange_Click" Margin="0,0,5,0" Padding="8,4"
+                    ToolTip="Apply custom histogram range and bin count"/>
+                                <Button x:Name="btnResetRange" Content="Reset to Data Range" 
+                    Click="ResetToDataRange_Click" Padding="8,4"
+                    ToolTip="Reset to use full data range"/>
+                            </StackPanel>
+                        </Grid>
+                    </GroupBox>
                     <TextBlock Text="Data Input Panel" 
                                FontSize="16" 
                                FontWeight="Bold" 
